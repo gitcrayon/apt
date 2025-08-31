@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>아파트 옵션 금액 계산기</title>
+  <style>
+    :root{
+      --bg: #0b0c10;
+      --panel: #111318;
+      --muted: #6b7280;
+      --text: #e5e7eb;
+      --brand: #4f46e5;
+      --brand-2: #8b5cf6;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --border: #22252c;
+      --chip: #1c1f27;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --round: 16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0b0c10,#0e1116);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,Helvetica,Arial,sans-serif}
+    .app{max-width:1200px;margin-inline:auto;padding:24px}
+
+    /* Sticky total bar */
+    .total-bar{position:sticky;top:0;z-index:5;backdrop-filter:saturate(120%) blur(8px);background:rgba(15,17,22,.75);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow)}
+    .total-bar h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px;display:flex;gap:10px;align-items:center}
+    .total-amount{font-size:24px;font-weight:800;background:linear-gradient(90deg,var(--brand),var(--brand-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+    /* Layout */
+    .layout{display:grid;grid-template-columns:1.1fr .9fr;gap:20px}
+    @media (max-width: 980px){.layout{grid-template-columns:1fr;}}
+
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));border:1px solid var(--border);border-radius:var(--round);box-shadow:var(--shadow)}
+    .card-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .card-header h2{margin:0;font-size:16px}
+    .card-body{padding:18px 20px}
+
+    /* Form grid */
+    form{display:grid;gap:14px}
+    .field{display:grid;gap:8px}
+    .label{font-size:13px;color:var(--muted);}
+
+    /* modern select */
+    .select{position:relative}
+    .select select{appearance:none;-webkit-appearance:none;-moz-appearance:none;width:100%;padding:12px 44px 12px 14px;border-radius:12px;border:1px solid var(--border);background:linear-gradient(180deg,#151923,#121621);color:var(--text);outline:none;transition:.2s;border-color:rgba(255,255,255,.08)}
+    .select select:focus{box-shadow:0 0 0 4px rgba(79,70,229,.2), inset 0 0 0 1px rgba(79,70,229,.5);border-color:var(--brand)}
+    .select::after{content:"";position:absolute;right:14px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;border-right:2px solid #a7aab4;border-bottom:2px solid #a7aab4;pointer-events:none}
+
+    /* text inputs (dong, ho) */
+    .input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:linear-gradient(180deg,#151923,#121621);color:var(--text);outline:none}
+    .input:focus{box-shadow:0 0 0 4px rgba(79,70,229,.2), inset 0 0 0 1px rgba(79,70,229,.5);border-color:var(--brand)}
+    .input.invalid{border-color:var(--danger)}
+
+    /* checkbox list */
+    .checklist{display:grid;gap:10px}
+    .option{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--chip);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+    .option .left{display:flex;align-items:center;gap:10px}
+    .option input[type="checkbox"]{width:18px;height:18px;border-radius:6px;accent-color:var(--brand)}
+    .price-chip{font-weight:700;background:linear-gradient(90deg,#232630,#1b1e27);border:1px solid var(--border);padding:6px 10px;border-radius:999px}
+
+    /* quote */
+    .quote{position:sticky;top:76px}
+    .quote h3{margin:0 0 8px 0}
+    .line{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px dashed rgba(255,255,255,.08)}
+    .line .muted{color:var(--muted)}
+    .group-title{margin-top:18px;color:#c7c9d3;font-weight:700}
+    .subtotal{display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding:8px 0;font-weight:700}
+    .grand{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:18px}
+
+    /* helper row */
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media (max-width:560px){.row{grid-template-columns:1fr}}
+
+    .hint{font-size:12px;color:var(--muted)}
+
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .btn{appearance:none;border:none;border-radius:12px;padding:10px 14px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:white;font-weight:700;cursor:pointer}
+    .btn.secondary{background:linear-gradient(180deg,#1b1f28,#171a22);border:1px solid var(--border);color:#d4d7df}
+
+    @media print{
+      body{background:white;color:black}
+      .total-bar,.actions{display:none}
+      .layout{grid-template-columns:1fr}
+      .card{box-shadow:none;border:1px solid #ccc}
+      .quote{position:static}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <div class="total-bar" aria-live="polite">
+      <h1>총 합계금액</h1>
+      <div class="total-amount" id="grandTotalTop">0원</div>
+    </div>
+
+    <div class="layout">
+      <section class="card">
+        <div class="card-header"><h2>계산 항목</h2></div>
+        <div class="card-body">
+          <form id="calcForm">
+
+            <!-- 1. 타입(평형) -->
+            <div class="field">
+              <label class="label" for="type">1) 타입(평형)</label>
+              <div class="select">
+                <select id="type" name="type">
+                  <option value="84A">84A</option>
+                  <option value="84B">84B</option>
+                  <option value="84C">84C</option>
+                  <option value="84D">84D</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 2. 동/호 숫자 입력 -->
+            <div class="field">
+              <label class="label">2) 동/호 (키보드 숫자만 입력)</label>
+              <div class="row">
+                <div>
+                  <input class="input" id="dong" inputmode="numeric" autocomplete="off" placeholder="동 (3자리)" maxlength="3" aria-describedby="dongHint" />
+                  <div id="dongHint" class="hint">예: 101, 102 · 숫자만</div>
+                </div>
+                <div>
+                  <input class="input" id="ho" inputmode="numeric" autocomplete="off" placeholder="호 (1자리)" maxlength="1" aria-describedby="hoHint" />
+                  <div id="hoHint" class="hint">예: 1, 2 · 숫자만</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. 층 구분 -->
+            <div class="field">
+              <label class="label" for="floor">3) 층 구분</label>
+              <div class="select">
+                <select id="floor">
+                  <option>1층</option>
+                  <option>2층</option>
+                  <option selected>3~4층</option>
+                  <option>5~9층</option>
+                  <option>10~19층</option>
+                  <option>20층 이상</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 4. 옵션 (체크박스) -->
+            <div class="field">
+              <label class="label">4) 옵션 (타입에 따라 가격 변동)</label>
+              <div class="checklist" id="optList"></div>
+            </div>
+
+            <!-- 5. 천장형 시스템에어컨 (드롭다운) -->
+            <div class="field">
+              <label class="label" for="ac">5) 천장형 시스템에어컨</label>
+              <div class="select">
+                <select id="ac">
+                  <option value="2">2대</option>
+                  <option value="3">3대</option>
+                  <option value="4" selected>4대</option>
+                  <option value="5">5대</option>
+                </select>
+              </div>
+              <div class="hint" id="acPriceHint">선택가격: <b id="acPriceText">0원</b></div>
+            </div>
+
+            <!-- 6. 시스클라인 (드롭다운) -->
+            <div class="field">
+              <label class="label" for="syscline">6) 시스클라인</label>
+              <div class="select">
+                <select id="syscline">
+                  <option value="2">2대</option>
+                  <option value="3" selected>3대</option>
+                  <option value="5">5대</option>
+                </select>
+              </div>
+              <div class="hint">선택가격: <b id="sysclinePriceText">0원</b></div>
+            </div>
+
+            <!-- 7. 주방가전 (체크박스) -->
+            <div class="field">
+              <label class="label">7) 주방가전</label>
+              <div class="checklist" id="applianceList"></div>
+            </div>
+
+            <!-- 8. 태양광 차단필름 (드롭다운) -->
+            <div class="field">
+              <label class="label" for="film">8) 태양광 차단필름(투과율)</label>
+              <div class="select">
+                <select id="film">
+                  <option value="none">선택안함</option>
+                  <option value="selected">선택</option>
+                </select>
+              </div>
+              <div class="hint">선택가격: <b id="filmPriceText">0원</b></div>
+            </div>
+
+            <div class="actions">
+              <button type="button" class="btn" id="resetBtn">초기화</button>
+            </div>
+
+          </form>
+        </div>
+      </section>
+
+      <!-- 견적서 사이드 -->
+      <aside class="card quote">
+        <div class="card-header"><h2>견적서</h2></div>
+        <div class="card-body" id="quote">
+          <div class="group">
+            <div class="group-title">기본가</div>
+            <div class="line"><span class="muted" id="baseDesc">-</span><strong id="basePrice">0원</strong></div>
+          </div>
+          <div class="group">
+            <div class="group-title">옵션 (4)</div>
+            <div id="quoteOptions"></div>
+            <div class="subtotal"><span>옵션 소계</span><strong id="optSubtotal">0원</strong></div>
+          </div>
+          <div class="group">
+            <div class="group-title">천장형 시스템에어컨 (5)</div>
+            <div class="line"><span class="muted" id="acDesc">-</span><strong id="acPrice">0원</strong></div>
+          </div>
+          <div class="group">
+            <div class="group-title">시스클라인 (6)</div>
+            <div class="line"><span class="muted" id="sysclineDesc">-</span><strong id="sysclinePrice">0원</strong></div>
+          </div>
+          <div class="group">
+            <div class="group-title">주방가전 (7)</div>
+            <div id="quoteAppliances"></div>
+            <div class="subtotal"><span>주방가전 소계</span><strong id="applianceSubtotal">0원</strong></div>
+          </div>
+          <div class="group">
+            <div class="group-title">태양광 차단필름 (8)</div>
+            <div class="line"><span class="muted" id="filmDesc">-</span><strong id="filmPrice">0원</strong></div>
+          </div>
+          <div class="line grand"><span>총 합계</span><strong id="grandTotal">0원</strong></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // ====== 구성 데이터 (필요 시 이곳 숫자만 수정) ======
+    const CURRENCY = new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 });
+
+    // 층 프리미엄/디스카운트 (가산율)
+    const FLOOR_FACTOR = {
+      '1층': -0.015,
+      '2층': -0.010,
+      '3~4층': 0,
+      '5~9층': 0.007,
+      '10~19층': 0.012,
+      '20층 이상': 0.020,
+    };
+
+    // 4) 옵션 가격 (타입 의존)
+    const OPTION_PRICE_BY_TYPE = {
+      '84A': {
+        opt1: 17_500_000, // 발코니 확장
+        opt2: 4_840_000,  // 욕실특화
+        opt3: 4_890_000,  // 마감특화
+        opt4: 13_340_000,  // 주방특화
+        opt5: 3_030_000,  // 침실붙박이장
+        opt6: 1_980_000,    // 냉장고장
+        opt7: 1_500_000,  // 현관중문
+        opt8: 4_590_000,  // 바닥재(원목마루)
+        opt9: 3_580_000,  // 바닥재(원목마루+포세린타일)
+      },
+      '84B': { opt1: 19_600_000, opt2: 4_840_000, opt3: 4_590_000, opt4: 11_090_000, opt5: 3_030_000, opt6: 1_980_000, opt7: 1_500_000, opt8: 4_470_000, opt9: 3_260_000 },
+      '84C': { opt1: 17_500_000, opt2: 4_840_000, opt3: 5_230_000, opt4: 7_950_000, opt5: 3_030_000, opt6: 1_020_000, opt7: 1_500_000, opt8: 4_426_000, opt9: 3_130_000 },
+      '84D': { opt1: 17_500_000, opt2: 4_840_000, opt3: 4_800_000, opt4: 10_540_000, opt5: 3_030_000, opt6: 1_020_000, opt7: 1_500_000, opt8: 4_550_000, opt9: 3_570_000 },
+    };
+
+    // 5) 천장형 시스템에어컨 (대수별 가격)
+    const AC_PRICE = { 2: 3_340_000, 3: 4_600_000, 4: 6_140_000, 5: 7_240_000 };
+
+    // 6) 시스클라인 (대수별 가격)
+    const SYSCLINE_PRICE = { 2: 1_750_000, 3: 2_625_000, 5: 4_375_000 };
+
+    // 7) 주방가전 (고정 가격)
+    const APPLIANCE_PRICE = {
+      a1: 5_750_000, // 빌트인 냉장고1(S711SI24B)
+      a2: 7_650_000, // 빌트인 냉장고2(S691SI34BS2)
+      a3: 1_450_000, // 빌트인 김치냉장고(K221PR148)
+      a4: 540_000,   // 광파오븐(MZ385EBTD)
+      a5: 1_100_000, // 식기세척기(DUB22S82)
+      a6: 1_220_000,   // 쿡탑1(BEI3GTBI)
+      a7: 450_000, // 쿡탑2(CIHR-D303FB)
+    };
+
+    // 8) 태양광 차단필름 (타입 의존, 선택 시)
+    const FILM_PRICE_BY_TYPE = { '84A': 1_460_000, '84B': 1_650_000, '84C': 1_350_000, '84D': 1_460_000 };
+
+
+    // base price table
+    const baseLine = {
+      '84A': {
+        '102' : {'3':1, '4':1},
+        '103' : {'3':1, '4':1},
+        '104' : {'3':1, '4':1},
+        '105' : {'1':2, '2':2, '3':1, '4':1},
+        '107' : {'1':2, '3':2},
+        '110' : {'1':1, '2':1},
+        '111' : {'1':1, '3':1},
+        '116' : {'1':1, '2':1},
+        '117' : {'1':1, '2':1}
+      },
+      '84B': {
+        '101' : {'1':1, '2':1, '3':2, '4':2},
+        '112' : {'1':2, '2':2, '4':2},
+        '113' : {'1':2, '2':2},
+        '114' : {'1':2, '2':2},
+        '115' : {'1':2, '2':2}
+      },
+      '84C': {
+        '107' : {'2':1},
+        '108' : {'3':2},
+        '109' : {'3':2},
+        '110' : {'3':2},
+        '111' : {'2':2},
+        '112' : {'3':2}
+      },
+      '84D': {
+        '108': {'4':1},
+        '109': {'4':1},
+        '109': {'4':1}
+      }
+    };
+
+    const basePrice = {
+      '84A1' : {
+        '1층': 299_900_000,
+        '2층': 324_600_000,
+        '3~4층': 338_700_000,
+        '5~9층': 345_700_000,
+        '10~19층': 352_800_000,
+        '20층 이상': 359_900_000
+      },
+      '84A2' : {
+        '1층': 305_900_000,
+        '2층': 331_100_000,
+        '3~4층': 345_500_000,
+        '5~9층': 352_700_000,
+        '10~19층': 359_900_000,
+        '20층 이상': 367_100_000
+      },
+      '84B1' : {
+        '1층': 0,
+        '2층': 330_700_000,
+        '3~4층': 345_100_000,
+        '5~9층': 352_300_000,
+        '10~19층': 359_500_000,
+        '20층 이상': 366_700_000
+      },
+      '84B2' : {
+        '1층': 299_600_000,
+        '2층': 324_300_000,
+        '3~4층': 338_400_000,
+        '5~9층': 345_400_000,
+        '10~19층': 352_500_000,
+        '20층 이상': 359_500_000
+      },
+      '84C1' : {
+        '1층': 303_300_000,
+        '2층': 328_300_000,
+        '3~4층': 342_600_000,
+        '5~9층': 349_700_000,
+        '10~19층': 356_900_000,
+        '20층 이상': 364_000_000
+      },
+      '84C2' : {
+        '1층': 297_400_000,
+        '2층': 321_900_000,
+        '3~4층': 335_900_000,
+        '5~9층': 342_900_000,
+        '10~19층': 349_900_000,
+        '20층 이상': 355_900_000
+      },
+      '84D1' : {
+        '1층': 0,
+        '2층': 324_600_000,
+        '3~4층': 338_700_000,
+        '5~9층': 345_800_000,
+        '10~19층': 352_800_000,
+        '20층 이상': 359_900_000
+      }
+    }
+    // ====== 기본가 계산 함수 (테이블 하드코딩 X, 조합 로직) ======
+    function getBasePrice(type, dong, ho, floorGroup){
+      let result = 0;
+      const aptLine = baseLine?.[type]?.[dong]?.[ho];
+      if( aptLine === undefined ) return result;
+
+      const base = basePrice[type+aptLine]?.[floorGroup];
+      console.log(base);
+      
+      result +=base;
+
+      // 동 가중치: 마지막 자리 * 0.05% (0~0.45%), + 동의 백자리대에 따른 소폭 가산
+      //const lastDigit = Number(String(dong).slice(-1)) || 0;
+      //const dongBucket = Math.floor((Number(dong)||0)/100); // 1,2,3...
+      //const dongF = (lastDigit * 0.0005) + (dongBucket===1?0.002:(dongBucket===2?0.001:0));
+
+      // 호 가중치: 1~2호 +0.3%, 3~5호 +0.2%, 나머지 0%
+      //const nHo = Number(ho)||0;
+      //const hoF = nHo>=1 && nHo<=2 ? 0.003 : (nHo>=3 && nHo<=5 ? 0.002 : 0);
+
+      //const result = Math.round(base * (1 + floorF + dongF + hoF) / 10_000) * 10_000; // 만원 단위 반올림
+      return result;
+    }
+
+    // ====== DOM ======
+    const els = {
+      type: document.getElementById('type'),
+      dong: document.getElementById('dong'),
+      ho: document.getElementById('ho'),
+      floor: document.getElementById('floor'),
+      ac: document.getElementById('ac'),
+      syscline: document.getElementById('syscline'),
+      film: document.getElementById('film'),
+      optList: document.getElementById('optList'),
+      applianceList: document.getElementById('applianceList'),
+      // price texts
+      acPriceText: document.getElementById('acPriceText'),
+      sysclinePriceText: document.getElementById('sysclinePriceText'),
+      filmPriceText: document.getElementById('filmPriceText'),
+      // quote area
+      baseDesc: document.getElementById('baseDesc'),
+      basePrice: document.getElementById('basePrice'),
+      quoteOptions: document.getElementById('quoteOptions'),
+      optSubtotal: document.getElementById('optSubtotal'),
+      acDesc: document.getElementById('acDesc'),
+      acPrice: document.getElementById('acPrice'),
+      sysclineDesc: document.getElementById('sysclineDesc'),
+      sysclinePrice: document.getElementById('sysclinePrice'),
+      quoteAppliances: document.getElementById('quoteAppliances'),
+      applianceSubtotal: document.getElementById('applianceSubtotal'),
+      filmDesc: document.getElementById('filmDesc'),
+      filmPrice: document.getElementById('filmPrice'),
+      grandTotal: document.getElementById('grandTotal'),
+      grandTotalTop: document.getElementById('grandTotalTop'),
+      resetBtn: document.getElementById('resetBtn'),
+      printBtn: document.getElementById('printBtn'),
+    };
+
+    // ====== 동/호 숫자만 입력 (키보드) ======
+    function onlyDigits(e){
+      const maxLen = e.target.getAttribute('maxlength') || 99;
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, maxLen);
+      validateDongHo();
+      recalc();
+    }
+    els.dong.addEventListener('input', onlyDigits);
+    els.ho.addEventListener('input', onlyDigits);
+
+    function validateDongHo(){
+      const dongOk = /^\d{3}$/.test(els.dong.value);
+      const hoOk = /^\d{1}$/.test(els.ho.value);
+      els.dong.classList.toggle('invalid', !dongOk && els.dong.value.length>0);
+      els.ho.classList.toggle('invalid', !hoOk && els.ho.value.length>0);
+      return dongOk && hoOk;
+    }
+
+    // ====== UI 생성: 옵션/가전 체크박스 ======
+    const OPTION_META = [
+      { key: 'opt1', label: '옵션1 - 발코니 확장' },
+      { key: 'opt2', label: '옵션2 - 욕실특화' },
+      { key: 'opt3', label: '옵션3 - 마감특화' },
+      { key: 'opt4', label: '옵션4 - 주방특화' },
+      { key: 'opt5', label: '옵션5 - 침실붙박이장' },
+      { key: 'opt6', label: '옵션6 - 냉장고장' },
+      { key: 'opt7', label: '옵션7 - 현관중문' },
+      { key: 'opt8', label: '옵션8 - 바닥재(원목마루)' },
+      { key: 'opt9', label: '옵션9 - 바닥재(원목마루+포세린타일)' },
+    ];
+
+    const APPLIANCE_META = [
+      { key: 'a1', label: '빌트인 냉장고1 (S711SI24B)' },
+      { key: 'a2', label: '빌트인 냉장고2 (S691SI34BS2)' },
+      { key: 'a3', label: '빌트인 김치냉장고 (K221PR148)' },
+      { key: 'a4', label: '광파오븐 (MZ385EBTD)' },
+      { key: 'a5', label: '식기세척기 (DUB22S82)' },
+      { key: 'a6', label: '쿡탑1 (BEI3GTBI)' },
+      { key: 'a7', label: '쿡탑2 (CIHR-D303FB)' },
+    ];
+
+    function createOptionList(){
+      els.optList.innerHTML = '';
+      const t = els.type.value;
+      OPTION_META.forEach(meta=>{
+        const price = OPTION_PRICE_BY_TYPE[t][meta.key] || 0;
+        const id = `opt_${meta.key}`;
+        const row = document.createElement('label');
+        row.className = 'option';
+        row.innerHTML = `
+          <span class="left">
+            <input type="checkbox" id="${id}" data-key="${meta.key}" />
+            <span>${meta.label}</span>
+          </span>
+          <span class="price-chip" id="price_${meta.key}">${CURRENCY.format(price)}</span>
+        `;
+        const input = row.querySelector('input');
+        input.addEventListener('change', (e)=>{
+          // 바닥재(8)와 (9)는 상호 배타 처리
+          if(meta.key==='opt8' && e.target.checked){
+            const other = document.querySelector('input[data-key="opt9"]');
+            if(other) other.checked = false;
+          }
+          if(meta.key==='opt9' && e.target.checked){
+            const other = document.querySelector('input[data-key="opt8"]');
+            if(other) other.checked = false;
+          }
+          recalc();
+        });
+        els.optList.appendChild(row);
+      });
+    }
+
+    function createApplianceList(){
+      els.applianceList.innerHTML = '';
+      APPLIANCE_META.forEach(meta=>{
+        const price = APPLIANCE_PRICE[meta.key] || 0;
+        const id = `app_${meta.key}`;
+        const row = document.createElement('label');
+        row.className = 'option';
+        row.innerHTML = `
+          <span class="left">
+            <input type="checkbox" id="${id}" data-key="${meta.key}" />
+            <span>${meta.label}</span>
+          </span>
+          <span class="price-chip">${CURRENCY.format(price)}</span>
+        `;
+        const input = row.querySelector('input');
+        input.addEventListener('change', (e)=>{
+          // 쿡탑1,2 상호 배타
+          if(meta.key==='a6' && e.target.checked){
+            const other = document.querySelector('input[data-key="a7"]');
+            if(other) other.checked = false;
+          }
+          if(meta.key==='a7' && e.target.checked){
+            const other = document.querySelector('input[data-key="a6"]');
+            if(other) other.checked = false;
+          }
+          recalc();
+        });
+        els.applianceList.appendChild(row);
+      });
+    }
+
+    // ====== AC 5대 제한 (84A/84D만 가능) ======
+    function enforceAcLimit(){
+      const allow5 = ['84A','84D'].includes(els.type.value);
+      const opt5 = [...els.ac.options].find(o=>o.value==='5');
+      if(opt5){
+        opt5.disabled = !allow5;
+        if(!allow5 && els.ac.value==='5'){
+          els.ac.value = '4';
+        }
+      }
+    }
+
+    // ====== 가격 재계산 및 견적서 렌더 ======
+    function recalc(){
+      // base
+      const type = els.type.value;
+      const dong = els.dong.value;
+      const ho = els.ho.value;
+      const floor = els.floor.value;
+
+      const base = getBasePrice(type, dong, ho, floor);
+      els.baseDesc.textContent = `${type} · ${dong?dong+'동':''}${ho?(' '+ho+'호'):''}${(!dong&&!ho)?'동/호 미입력':''} · ${floor}`;
+      els.basePrice.textContent = CURRENCY.format(base);
+
+      // 옵션 (4)
+      let optSum = 0;
+      els.quoteOptions.innerHTML = '';
+      OPTION_META.forEach(meta=>{
+        const checkbox = document.querySelector(`input[data-key="${meta.key}"]`);
+        const unit = OPTION_PRICE_BY_TYPE[type][meta.key] || 0;
+        // 가격 표시 갱신
+        const chip = document.getElementById(`price_${meta.key}`);
+        if(chip) chip.textContent = CURRENCY.format(unit);
+        if(checkbox && checkbox.checked){
+          optSum += unit;
+          const line = document.createElement('div');
+          line.className = 'line';
+          line.innerHTML = `<span class="muted">${meta.label}</span><strong>${CURRENCY.format(unit)}</strong>`;
+          els.quoteOptions.appendChild(line);
+        }
+      });
+      els.optSubtotal.textContent = CURRENCY.format(optSum);
+
+      // 에어컨 (5)
+      const acCount = Number(els.ac.value);
+      const acPrice = AC_PRICE[acCount] || 0;
+      els.acPriceText.textContent = CURRENCY.format(acPrice);
+      els.acDesc.textContent = `${acCount}대`;
+      els.acPrice.textContent = CURRENCY.format(acPrice);
+
+      // 시스클라인 (6)
+      const scCount = Number(els.syscline.value);
+      const scPrice = SYSCLINE_PRICE[scCount] || 0;
+      els.sysclinePriceText.textContent = CURRENCY.format(scPrice);
+      els.sysclineDesc.textContent = `${scCount}대`;
+      els.sysclinePrice.textContent = CURRENCY.format(scPrice);
+
+      // 주방가전 (7)
+      let appSum = 0;
+      els.quoteAppliances.innerHTML = '';
+      APPLIANCE_META.forEach(meta=>{
+        const checkbox = document.querySelector(`input[data-key="${meta.key}"]`);
+        const unit = APPLIANCE_PRICE[meta.key] || 0;
+        if(checkbox && checkbox.checked){
+          appSum += unit;
+          const line = document.createElement('div');
+          line.className = 'line';
+          line.innerHTML = `<span class="muted">${meta.label}</span><strong>${CURRENCY.format(unit)}</strong>`;
+          els.quoteAppliances.appendChild(line);
+        }
+      });
+      els.applianceSubtotal.textContent = CURRENCY.format(appSum);
+
+      // 필름 (8)
+      const filmSel = els.film.value;
+      const filmPrice = filmSel==='selected' ? (FILM_PRICE_BY_TYPE[type]||0) : 0;
+      els.filmPriceText.textContent = CURRENCY.format(filmPrice);
+      els.filmDesc.textContent = filmSel==='selected' ? '선택' : '선택안함';
+      els.filmPrice.textContent = CURRENCY.format(filmPrice);
+
+      // 총합
+      const grand = base + optSum + acPrice + scPrice + appSum + filmPrice;
+      els.grandTotal.textContent = CURRENCY.format(grand);
+      els.grandTotalTop.textContent = CURRENCY.format(grand);
+    }
+
+    // ====== 이벤트 바인딩 ======
+    els.type.addEventListener('change', ()=>{enforceAcLimit(); createOptionList(); recalc();});
+    els.floor.addEventListener('change', recalc);
+    els.ac.addEventListener('change', recalc);
+    els.syscline.addEventListener('change', recalc);
+    els.film.addEventListener('change', recalc);
+
+    // 초기화/출력
+    els.resetBtn.addEventListener('click', ()=>{
+      document.getElementById('calcForm').reset();
+      createOptionList();
+      createApplianceList();
+      enforceAcLimit();
+      els.dong.value = '';
+      els.ho.value = '';
+      recalc();
+    });
+    els.printBtn.addEventListener('click', ()=>window.print());
+  </script>
+</body>
+<script>
+    // ====== 초기 렌더 ======
+    createOptionList();
+    createApplianceList();
+    enforceAcLimit();
+    recalc();
+</script>
+</html>
