@@ -544,6 +544,16 @@
             const other = document.querySelector('input[data-key="a6"]');
             if(other) other.checked = false;
           }
+
+          // 냉장고1,2 상호 배타
+          if(meta.key==='a1' && e.target.checked){
+            const other = document.querySelector('input[data-key="a2"]');
+            if(other) other.checked = false;
+          }
+          if(meta.key==='a2' && e.target.checked){
+            const other = document.querySelector('input[data-key="a1"]');
+            if(other) other.checked = false;
+          }
           recalc();
         });
         els.applianceList.appendChild(row);
